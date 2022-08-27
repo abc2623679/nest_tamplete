@@ -1,14 +1,20 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpCode, Header, Redirect, Query, ParseIntPipe, HttpStatus, DefaultValuePipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpCode, Header, Redirect, Query, ParseIntPipe, HttpStatus, DefaultValuePipe, Headers, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserLoginDto } from './dto/user-login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
-import { off } from 'process';
+import { ValidationPipe } from '../pipe/validation.pipe';
+import { AuthService } from '../auth/auth.service';
+import { UserInfo } from './interface/interface';
+import { GuardGuard } from '../guard/guard.guard';
 
 @Controller('users')
 export class UsersController {
 
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly authService :AuthService
+    ){}
 
   @Post()
   async createUser(@Body() dto: CreateUserDto): Promise<(number | string)[]> {
@@ -32,10 +38,14 @@ export class UsersController {
     return await this.usersService.login(email,password)
   }
 
+  @UseGuards(GuardGuard)
   @Get('/:id')
-  async getUserInfo(@Param('id') userId: string): Promise<string> {
+  async getUserInfo(@Headers() headers:Headers ,@Param('id') userId: string):Promise<UserInfo> {
+    const jwtString = headers["authorization"].split('Bearer ')[1];
+
+    this.authService.verify(jwtString)
     
-    return await this.usersService.getUserInfo(userId)
+    return this.usersService.getUserInfo(userId)
   }
 
   @Get('/find/:id')
@@ -49,9 +59,11 @@ export class UsersController {
   findOne1(@Query('offset',new DefaultValuePipe(10), ParseIntPipe) offset :number,
            @Query('limit',new DefaultValuePipe(5), ParseIntPipe) limit :number){
 
-            console.log(offset)
-            console.log(limit)
-    return this.usersService.findOne(offset,limit);
+    return this.usersService.findOne(offset);
   }
-  
+
+  @Get('/find2/:id')
+  findOne2(@Query('offset',ValidationPipe) offset :number){
+    return this.usersService.findOne(offset);
+  }
 }
